@@ -1,0 +1,33 @@
+{
+  "projectInfo": {
+    "name": "CapitolTrack",
+    "description": "Civic engagement app tracking congressional bills and citizen consensus."
+  },
+  "collections": [
+    {
+      "name": "users",
+      "description": "Stores user profiles, location data, and preferences.",
+      "securityRules": "Users can only read and write their own profile.",
+      "fields": [
+        { "name": "uid", "type": "string", "description": "Firebase Auth UID" },
+        { "name": "email", "type": "string", "description": "User email address" },
+        { "name": "displayName", "type": "string", "description": "User's display name" },
+        { "name": "address", "type": "string", "description": "User's registered address for civic API lookups" },
+        { "name": "state", "type": "string", "description": "State abbreviation for local representative filtering" },
+        { "name": "createdAt", "type": "timestamp", "description": "Account creation time" },
+        { "name": "updatedAt", "type": "timestamp", "description": "Last profile update time" }
+      ]
+    },
+    {
+      "name": "votes",
+      "description": "Stores citizen votes on specific bills.",
+      "securityRules": "Users can only read and write their own votes. Aggregated views can be calculated server-side.",
+      "fields": [
+        { "name": "userId", "type": "string", "description": "Reference to the user UID" },
+        { "name": "billId", "type": "string", "description": "The ID of the bill (e.g., H.R. 6090)" },
+        { "name": "vote", "type": "string", "description": "The user's vote, e.g., 'yea' or 'nay'" },
+        { "name": "timestamp", "type": "timestamp", "description": "Time the vote was cast" }
+      ]
+    }
+  ]
+}
