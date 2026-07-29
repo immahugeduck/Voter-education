@@ -1,6 +1,6 @@
 {
-  "name": "Congress Tracker",
-  "description": "Understand and track politicians like a sports team. Real-time roll call voting records via GovTrack, state-by-state representative scorecards, and plain-language bill explanations designed for everyday voters.",
+  "name": "The Citizens Sentinel",
+  "description": "The Plain-Language Watchdog for the 119th Congress. Real-time roll call voting records, representative scorecards, and plain-language bill explanations styled as a classic broadsheet newspaper.",
   "requestFramePermissions": ["geolocation"],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

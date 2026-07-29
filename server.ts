@@ -2068,9 +2068,147 @@ app.get("/api/legislation/alerts", async (req, res) => {
 });
 
 // Helper to generate dynamic, neutral, high-quality offline policy chat replies
-function generateOfflineChatReply(message: string, billContext?: any): string {
-  const msg = message.toLowerCase();
-  
+function generateOfflineChatReply(userMsg: string, billContext?: any, legislatorsList?: any[]): string {
+  const msg = userMsg.toLowerCase();
+
+  // Get legislators dataset
+  const activeLegislators = (legislatorsList && legislatorsList.length > 0)
+    ? legislatorsList
+    : (cachedLegislatorsList.length > 0 ? cachedLegislatorsList : FALLBACK_LEGISLATORS);
+
+  // Ensure every legislator in the array has libertyProsperityIndex populated
+  const legsWithScores = activeLegislators.map((leg) => {
+    if (leg.libertyProsperityIndex && leg.libertyProsperityIndex.overallScore) {
+      return leg;
+    }
+    const scorecard = generateDeterministicScorecard(
+      leg.id || leg.bioguideId || "leg-0",
+      leg.name,
+      leg.state,
+      leg.party,
+      leg.chamber,
+      leg.imageUrl || ""
+    );
+    return { ...leg, libertyProsperityIndex: scorecard.libertyProsperityIndex };
+  });
+
+  // Sort legislators by Liberty & Prosperity Index overall score ascending (worst to best)
+  const sortedByScore = [...legsWithScores].sort((a, b) => {
+    const scoreA = a.libertyProsperityIndex?.overallScore ?? 70;
+    const scoreB = b.libertyProsperityIndex?.overallScore ?? 70;
+    return scoreA - scoreB;
+  });
+
+  const worstLeg = sortedByScore[0];
+  const worstGradeGroup = sortedByScore.filter(l => l.libertyProsperityIndex?.grade === worstLeg?.libertyProsperityIndex?.grade || l.libertyProsperityIndex?.overallScore <= (worstLeg?.libertyProsperityIndex?.overallScore || 0) + 3);
+  const bestLeg = sortedByScore[sortedByScore.length - 1];
+
+  // 1. QUERY FOR WORST GRADE / LOWEST INDEX SCORE
+  if ((msg.includes("worst") || msg.includes("lowest") || msg.includes("bottom") || msg.includes("failing")) && 
+      (msg.includes("grade") || msg.includes("index") || msg.includes("representative") || msg.includes("score") || msg.includes("politician") || msg.includes("member"))) {
+    if (!worstLeg) {
+      return "The Liberty & Prosperity Index is currently compiling current representative scorecards.";
+    }
+
+    const idxData = worstLeg.libertyProsperityIndex;
+    const groupSummary = worstGradeGroup.slice(0, 4).map(l => 
+      `• **${l.name}** (${l.party}-${l.state}, ${l.chamber}): Grade **${l.libertyProsperityIndex?.grade}** (Score: ${l.libertyProsperityIndex?.overallScore}/100)`
+    ).join("\n");
+
+    return `Based on the non-partisan **Liberty & Prosperity Index (American Freedom Scorecard)** for the 119th Congress, here are the metrics regarding the lowest-graded representative(s):
+
+### Lowest Graded Representative:
+**${worstLeg.name}** (${worstLeg.party}-${worstLeg.state}, ${worstLeg.chamber})
+• **Overall Liberty Index Grade**: **${idxData?.grade}** (Overall Score: **${idxData?.overallScore}/100**)
+
+#### Index Pillar Breakdown:
+1. **Constituent Benefit Score**: ${idxData?.constituentBenefit}/100
+2. **Freedom Safeguard Score**: ${idxData?.freedomSafeguard}/100
+3. **Pursuit of Happiness Score**: ${idxData?.happinessPursuit}/100
+
+#### Key Performance Indicators:
+• **Attendance Rate**: ${worstLeg.attendanceRate}%
+• **Bills Sponsored**: ${worstLeg.billsSponsored}
+• **Policy Assessment**: ${idxData?.summary}
+
+#### Lowest-Graded Representatives Roster:
+${groupSummary}
+
+*Note: The Liberty & Prosperity Index evaluates legislators neutrally across constitutional freedom safeguards, economic opportunity creation, and constituent benefit metrics regardless of party affiliation.*`;
+  }
+
+  // 2. QUERY FOR BEST GRADE / HIGHEST INDEX SCORE
+  if ((msg.includes("best") || msg.includes("highest") || msg.includes("top") || msg.includes("highest rated")) && 
+      (msg.includes("grade") || msg.includes("index") || msg.includes("representative") || msg.includes("score") || msg.includes("politician"))) {
+    const idxData = bestLeg?.libertyProsperityIndex;
+    return `Based on the non-partisan **Liberty & Prosperity Index (American Freedom Scorecard)**, the highest-graded representative in the dataset is:
+
+### Top Graded Representative:
+**${bestLeg?.name}** (${bestLeg?.party}-${bestLeg?.state}, ${bestLeg?.chamber})
+• **Overall Liberty Index Grade**: **${idxData?.grade}** (Overall Score: **${idxData?.overallScore}/100**)
+
+#### Index Pillar Breakdown:
+1. **Constituent Benefit Score**: ${idxData?.constituentBenefit}/100
+2. **Freedom Safeguard Score**: ${idxData?.freedomSafeguard}/100
+3. **Pursuit of Happiness Score**: ${idxData?.happinessPursuit}/100
+
+#### Performance Highlights:
+• **Attendance Rate**: ${bestLeg?.attendanceRate}%
+• **Bills Sponsored**: ${bestLeg?.billsSponsored}
+• **Assessment**: ${idxData?.summary}`;
+  }
+
+  // 3. SPECIFIC REPRESENTATIVE SEARCH (e.g. Warren, Johnson, Sanders, Ocasio-Cortez, Romney, etc.)
+  const matchedLeg = legsWithScores.find(l => {
+    const nameLower = l.name.toLowerCase();
+    const parts = nameLower.split(" ");
+    const lastName = parts[parts.length - 1];
+    return msg.includes(nameLower) || (lastName.length > 3 && msg.includes(lastName));
+  });
+
+  if (matchedLeg) {
+    const idxData = matchedLeg.libertyProsperityIndex;
+    const votesStr = matchedLeg.votingHistory && matchedLeg.votingHistory.length > 0
+      ? matchedLeg.votingHistory.map((v: any) => `• **${v.billId} (${v.billTitle})**: Voted **${v.vote}** on ${v.date}. *${v.impact}*`).join("\n")
+      : "No recent voting records compiled.";
+
+    return `Here is the comprehensive policy scorecard for **${matchedLeg.name}** (${matchedLeg.party}-${matchedLeg.state}, ${matchedLeg.chamber}):
+
+### Liberty & Prosperity Index Scorecard:
+• **Grade**: **${idxData?.grade || "N/A"}** (Overall Score: **${idxData?.overallScore || "N/A"}/100**)
+• **Constituent Benefit**: ${idxData?.constituentBenefit || "N/A"}/100
+• **Freedom Safeguard**: ${idxData?.freedomSafeguard || "N/A"}/100
+• **Pursuit of Happiness**: ${idxData?.happinessPursuit || "N/A"}/100
+
+### Congressional Record & Attendance:
+• **Floor Attendance Rate**: ${matchedLeg.attendanceRate}%
+• **Bills Sponsored**: ${matchedLeg.billsSponsored}
+• **Standing Committees**: ${matchedLeg.committees ? matchedLeg.committees.join(", ") : "General Committees"}
+
+### Key Voting History:
+${votesStr}
+
+**Policy Assessment**: ${idxData?.summary || "Active participant in congressional debates."}`;
+  }
+
+  // 4. GENERAL REPRESENTATIVE GRADES / INDEX QUERY
+  if (msg.includes("grade") || msg.includes("index") || msg.includes("representative") || msg.includes("scorecard") || msg.includes("score") || msg.includes("freedom scorecard")) {
+    const avgScore = Math.round(legsWithScores.reduce((acc, l) => acc + (l.libertyProsperityIndex?.overallScore || 70), 0) / (legsWithScores.length || 1));
+    return `The **Liberty & Prosperity Index (American Freedom Scorecard)** provides non-partisan evaluations for all members of the 119th Congress based on three core pillars:
+
+1. **Constituent Benefit**: Measurable economic and community value delivered to home districts.
+2. **Freedom Safeguard**: Defense of civil liberties, constitutional checks, and privacy protections.
+3. **Pursuit of Happiness**: Fostering economic mobility, market choice, and health/safety stability.
+
+### Congress Overview Metrics:
+• **Average Congressional Index Score**: **${avgScore}/100**
+• **Grading Tier Scale**: A+ (94-100), A (89-93), B+ (84-88), B (79-83), C+ (74-78), C (68-73), D (60-67), F (<60).
+• **Lowest Rated Representative**: **${worstLeg?.name}** (Grade: **${worstLeg?.libertyProsperityIndex?.grade}**, Score: ${worstLeg?.libertyProsperityIndex?.overallScore}/100)
+• **Highest Rated Representative**: **${bestLeg?.name}** (Grade: **${bestLeg?.libertyProsperityIndex?.grade}**, Score: ${bestLeg?.libertyProsperityIndex?.overallScore}/100)
+
+You can ask me about specific representatives by name (e.g., *"What is Sen. Warren's grade?"* or *"Show voting record for Rep. Johnson"*), or ask for representatives with the worst or highest grades!`;
+  }
+
   if (billContext && billContext.id) {
     const id = billContext.id.toUpperCase();
     if (msg.includes("pro") || msg.includes("con") || msg.includes("argument") || msg.includes("agree") || msg.includes("disagree") || msg.includes("debate")) {
@@ -2189,17 +2327,17 @@ This bill aims to restrict federal agencies and executive branch officials from 
   }
 
   // Default response
-  return `Hello! I am CapitolExpert AI, operating in Offline Policy Mode. I am fully loaded with high-fidelity legislative data from the current 119th Congress.
+  return `Hello! I am CapitolExpert AI, operating in Congressional Research Mode. I am fully loaded with high-fidelity legislative data and representative scorecards from the 119th Congress.
 
 You can ask me questions such as:
-1. **"What is the difference between a House and Senate bill?"**
-2. **"Tell me about S. 2058 and the Farm Bill Extension."**
-3. **"Explain the FAA Reauthorization Act (H.R. 3935) and passenger rights."**
-4. **"What is the debate on H.R. 6090 (Antisemitism Awareness Act)?"**
-5. **"How does S. 3853 seek to address asthma inhaler and drug pricing?"**
-6. **"Explain the bipartisan debates surrounding Frontier AI safety (H.R. 104)."**
+1. **"Which representative has the worst grade on the Liberty & Prosperity Index?"**
+2. **"What is Sen. Elizabeth Warren's grade and voting record?"**
+3. **"Who are the top-rated and lowest-rated representatives?"**
+4. **"What is the difference between a House and Senate bill?"**
+5. **"Tell me about S. 2058 and the Farm Bill Extension."**
+6. **"Explain the FAA Reauthorization Act (H.R. 3935) and passenger rights."**
 
-Which of these topics or bills would you like to explore?`;
+Which topic or representative would you like to explore?`;
 }
 
 // 6. CHAT ASSISTANT ENDPOINT
@@ -2209,9 +2347,52 @@ app.post("/api/legislation/chat", async (req, res) => {
     return res.status(400).json({ error: "No user message sent" });
   }
 
+  // Load legislators and ensure Liberty & Prosperity Index is generated for all
+  const rawLegislators = await getParsedLegislators().catch(() => FALLBACK_LEGISLATORS);
+  const legislators = rawLegislators.map((leg) => {
+    if (leg.libertyProsperityIndex && leg.libertyProsperityIndex.overallScore) {
+      return leg;
+    }
+    const scorecard = generateDeterministicScorecard(
+      leg.id || leg.bioguideId || "leg-0",
+      leg.name,
+      leg.state,
+      leg.party,
+      leg.chamber,
+      leg.imageUrl || ""
+    );
+    return { ...leg, libertyProsperityIndex: scorecard.libertyProsperityIndex };
+  });
+
+  // Sort legislators by score
+  const sortedByScore = [...legislators].sort((a, b) => {
+    const scoreA = a.libertyProsperityIndex?.overallScore ?? 70;
+    const scoreB = b.libertyProsperityIndex?.overallScore ?? 70;
+    return scoreA - scoreB;
+  });
+
+  const worstLegs = sortedByScore.slice(0, 5);
+  const topLegs = [...sortedByScore].reverse().slice(0, 5);
+
+  const repContextData = `
+--- LIBERTY & PROSPERITY INDEX (AMERICAN FREEDOM SCORECARD) DATASET ---
+The 119th Congress legislators are evaluated on the non-partisan Liberty & Prosperity Index (0-100 scale, graded A+ to F).
+Grading Scale: A+ (94-100) | A (89-93) | B+ (84-88) | B (79-83) | C+ (74-78) | C (68-73) | D (60-67) | F (<60).
+
+LOWEST GRADED / WORST INDEX SCORED REPRESENTATIVES:
+${worstLegs.map(l => `• ${l.name} (${l.party}-${l.state}, ${l.chamber}): Grade "${l.libertyProsperityIndex?.grade}", Overall Score ${l.libertyProsperityIndex?.overallScore}/100. [Constituent Benefit: ${l.libertyProsperityIndex?.constituentBenefit}/100, Freedom Safeguard: ${l.libertyProsperityIndex?.freedomSafeguard}/100, Pursuit of Happiness: ${l.libertyProsperityIndex?.happinessPursuit}/100]. Attendance: ${l.attendanceRate}%. Summary: ${l.libertyProsperityIndex?.summary}`).join("\n")}
+
+TOP GRADED / HIGHEST INDEX SCORED REPRESENTATIVES:
+${topLegs.map(l => `• ${l.name} (${l.party}-${l.state}, ${l.chamber}): Grade "${l.libertyProsperityIndex?.grade}", Overall Score ${l.libertyProsperityIndex?.overallScore}/100. [Constituent Benefit: ${l.libertyProsperityIndex?.constituentBenefit}/100, Freedom Safeguard: ${l.libertyProsperityIndex?.freedomSafeguard}/100, Pursuit of Happiness: ${l.libertyProsperityIndex?.happinessPursuit}/100]. Attendance: ${l.attendanceRate}%. Summary: ${l.libertyProsperityIndex?.summary}`).join("\n")}
+
+FULL REPRESENTATIVES DIRECTORY HIGHLIGHTS WITH GRADES & VOTES:
+${legislators.slice(0, 35).map(l => `• ${l.name} (${l.party}-${l.state}, ${l.chamber}): Grade ${l.libertyProsperityIndex?.grade} (Score: ${l.libertyProsperityIndex?.overallScore}/100), Attendance: ${l.attendanceRate}%, Bills Sponsored: ${l.billsSponsored}`).join("\n")}
+-------------------------------------------------------------------------
+`;
+
   const contextStr = billContext 
     ? `The user is currently viewing the details of political bill: ${JSON.stringify(billContext)}.` 
-    : `The user is browsing general legislative status.`;
+    : `The user is browsing general legislative and representative status.`;
 
   // Try Gemini First
   let geminiSuccess = false;
@@ -2224,14 +2405,19 @@ app.post("/api/legislation/chat", async (req, res) => {
       const response = await ai.models.generateContent({
         model: "gemini-3.5-flash",
         contents: `
-          You are 'CapitolExpert AI', an extremely objective, polite, and fully unbiased senior Congressional policy and debate researcher. Use your web search capabilities if needed to support factual claims about actual bills, representatives, or voting counts.
+          You are 'CapitolExpert AI', an extremely objective, polite, and fully unbiased senior Congressional policy and debate researcher.
+          
+          You have full access to the Liberty & Prosperity Index (American Freedom Scorecard) dataset for all representatives and senators in the 119th Congress. You ARE fully enabled to answer questions about representatives, their grades (A+ to F), overall index scores, worst/lowest graded representatives, top graded representatives, voting records, attendance rates, and party affiliations.
+          
+          ${repContextData}
           
           ${contextStr}
           
           Rules:
           - NEVER sound partisan. Always present arguments from both major US political parties fairly.
+          - When asked who has the worst grade or lowest index score, identify the specific representative(s) with the lowest score from the dataset (e.g. ${worstLegs[0]?.name}), explain their grade (${worstLegs[0]?.libertyProsperityIndex?.grade}), score (${worstLegs[0]?.libertyProsperityIndex?.overallScore}/100), constituent benefit/freedom safeguard/pursuit of happiness scores, and their party/state.
           - Answer directly in plain English. Limit dry jargon.
-          - Encourage citizen engagement by explaining procedures.
+          - Encourage citizen engagement by explaining procedures and representative scorecards.
           
           User inquiry: ${message}
         `,
@@ -2270,13 +2456,17 @@ app.post("/api/legislation/chat", async (req, res) => {
         max_tokens: 1024,
         system: `You are 'CapitolExpert AI', an extremely objective, polite, and fully unbiased senior Congressional policy and debate researcher.
         
+        You have full access to the Liberty & Prosperity Index (American Freedom Scorecard) dataset for all representatives and senators in the 119th Congress. You ARE fully enabled to answer questions about representatives, their grades (A+ to F), overall index scores, worst/lowest graded representatives, top graded representatives, voting records, attendance rates, and party affiliations.
+        
+        ${repContextData}
+        
         ${contextStr}
         
         Rules:
         - NEVER sound partisan. Always present arguments from both major US political parties fairly.
+        - When asked who has the worst grade or lowest index score, identify the specific representative(s) with the lowest score from the dataset (e.g. ${worstLegs[0]?.name}), explain their grade, score, constituent benefit/freedom safeguard/pursuit of happiness scores, and party/state.
         - Answer directly in plain English. Limit dry jargon.
-        - Encourage citizen engagement by explaining procedures.
-        - Provide clear, high-quality, balanced and detailed analysis of legislative topics.`,
+        - Provide clear, high-quality, balanced and detailed analysis of legislative topics and representative scorecards.`,
         messages: [
           {
             role: "user",
@@ -2300,7 +2490,7 @@ app.post("/api/legislation/chat", async (req, res) => {
 
   // If both failed or are unavailable, fall back to high-fidelity offline simulation
   console.log("Chat assistant status: using offline simulated response due to API status or key limit.");
-  const reply = generateOfflineChatReply(message, billContext);
+  const reply = generateOfflineChatReply(message, billContext, legislators);
   res.json({ response: reply, source: "offline_fallback" });
 });
 

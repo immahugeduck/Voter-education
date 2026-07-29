@@ -69,9 +69,11 @@ export default function StandaloneChat() {
   }
 
   const suggestionPrompts = [
+    "Which representative has the worst grade on the Liberty & Prosperity Index?",
+    "Who are the top-rated and lowest-rated representatives in Congress?",
+    "Detail Sen. Elizabeth Warren's Liberty Index grade and voting history.",
     "What are the major structural differences between a House bill and a Senate bill?",
-    "Tell me about the recent bipartisan farm and crop credit re-authorizations in 2026.",
-    "Explain the debate concerning state-level corporate rental housing pricing software regulations.",
+    "Tell me about the recent bipartisan farm and crop credit re-authorizations.",
     "Detail how the FAA re-authorization impacts passenger rights regarding wheelchair support."
   ];
 

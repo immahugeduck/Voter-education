@@ -20,7 +20,8 @@ import {
   Flame, 
   AlertCircle,
   Clock,
-  ShieldAlert
+  ShieldAlert,
+  HelpCircle
 } from "lucide-react";
 import { Accomplishment, LegislatorScorecard, DailyBrief, KeyIssue } from "../types";
 
@@ -180,6 +181,7 @@ export default function Dashboard({
   const [chamberFilter, setChamberFilter] = useState<"ALL" | "House" | "Senate">("ALL");
   const [partyFilter, setPartyFilter] = useState<"ALL" | "D" | "R">("ALL");
   const [stateFilter, setStateFilter] = useState<string>("ALL");
+  const [sortFilter, setSortFilter] = useState<"NAME" | "WORST_GRADE" | "BEST_GRADE" | "ATTENDANCE">("NAME");
   const [directoryPage, setDirectoryPage] = useState<number>(1);
   const itemsPerPage = 12;
 
@@ -221,14 +223,31 @@ export default function Dashboard({
   const localRepresentatives = legislators.filter(l => l.state === selectedLocalState);
   
   // 2. Politicians Directory Filtered List
-  const filteredLegislators = legislators.filter(l => {
-    const matchesSearch = l.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                          l.id.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesChamber = chamberFilter === "ALL" || l.chamber === chamberFilter;
-    const matchesParty = partyFilter === "ALL" || l.party === partyFilter;
-    const matchesState = stateFilter === "ALL" || l.state === stateFilter;
-    return matchesSearch && matchesChamber && matchesParty && matchesState;
-  });
+  const filteredLegislators = legislators
+    .filter(l => {
+      const matchesSearch = l.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                            l.id.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesChamber = chamberFilter === "ALL" || l.chamber === chamberFilter;
+      const matchesParty = partyFilter === "ALL" || l.party === partyFilter;
+      const matchesState = stateFilter === "ALL" || l.state === stateFilter;
+      return matchesSearch && matchesChamber && matchesParty && matchesState;
+    })
+    .sort((a, b) => {
+      if (sortFilter === "WORST_GRADE") {
+        const scoreA = a.libertyProsperityIndex?.overallScore ?? 70;
+        const scoreB = b.libertyProsperityIndex?.overallScore ?? 70;
+        return scoreA - scoreB;
+      }
+      if (sortFilter === "BEST_GRADE") {
+        const scoreA = a.libertyProsperityIndex?.overallScore ?? 70;
+        const scoreB = b.libertyProsperityIndex?.overallScore ?? 70;
+        return scoreB - scoreA;
+      }
+      if (sortFilter === "ATTENDANCE") {
+        return b.attendanceRate - a.attendanceRate;
+      }
+      return a.name.localeCompare(b.name);
+    });
 
   const totalPages = Math.ceil(filteredLegislators.length / itemsPerPage);
   const paginatedLegislators = filteredLegislators.slice(
@@ -239,7 +258,7 @@ export default function Dashboard({
   // Reset page when filters change
   useEffect(() => {
     setDirectoryPage(1);
-  }, [searchTerm, chamberFilter, partyFilter, stateFilter]);
+  }, [searchTerm, chamberFilter, partyFilter, stateFilter, sortFilter]);
 
   // 3. Find legislators on the selected Standing Committee
   const committeeMembers = selectedCommittee 
@@ -251,49 +270,53 @@ export default function Dashboard({
   return (
     <div className="space-y-6">
       {/* ----------------------------------------------------
-          HERO BANNER & PROFILE SELECTOR
+          HERO BANNER & PROFILE SELECTOR (NEWS DESK MASTHEAD BANNER)
          ---------------------------------------------------- */}
-      <div className="bg-stone-900 p-6 sm:p-8 border-b-4 border-stone-950 relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-80 h-80 bg-amber-500/5 rounded-full blur-3xl transform transtone-x-1/2 -transtone-y-1/2"></div>
-        <div className="relative z-10">
-          <div className="space-y-3">
-            <div className="inline-flex items-center space-x-1.5 p-1 px-3 bg-amber-500/10 text-amber-400 rounded-full text-[10px] font-mono tracking-wider font-bold">
-              <Sparkles className="h-3 w-3" />
-              <span>DEMYSTIFYING THE 119TH CONGRESS</span>
+      <div className="bg-[#FAF7F0] p-6 sm:p-8 border-y-4 border-double border-[#1A1A1A] relative overflow-hidden shadow-xs">
+        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="space-y-2">
+            <div className="inline-flex items-center space-x-2 px-2.5 py-0.5 bg-[#1A1A1A] text-[#FBF9F5] text-[10px] font-mono tracking-widest font-bold uppercase">
+              <Zap className="h-3 w-3 text-amber-400" />
+              <span>THE CITIZENS SENTINEL • EDITORIAL DESK</span>
             </div>
-            <h1 className="text-2xl sm:text-3xl font-display font-black text-stone-100 tracking-tight leading-none">
-              Your Personalized Legislative HQ
+            <h1 className="text-2xl sm:text-3xl font-headline font-black text-[#1A1A1A] tracking-tight leading-tight">
+              119th Congress Broadsheet Intelligence
             </h1>
-            <p className="text-stone-400 text-sm leading-relaxed max-w-3xl">
-              Track live congressional accomplishments, monitor roll call voting breakdowns, examine upcoming debates, and search full legislator scorecard rosters.
+            <p className="font-serif text-stone-700 text-xs sm:text-sm leading-relaxed max-w-3xl">
+              Un-biased congressional reporting, plain-language legislative translations, roll call bulletins, and bipartisan consensus scorecards for everyday citizens.
             </p>
+          </div>
+
+          {/* Dateline badge */}
+          <div className="sepia-stamp self-start md:self-center shrink-0">
+            ★ VERIFIED CONGRESSIONAL DATA ★
           </div>
         </div>
 
         {/* Real-Time Session Status indicator bar */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-8 bg-stone-950/60 p-4 rounded-none border border-stone-800/80">
-          <div className="flex items-center space-x-3.5">
-            <div className="p-2 bg-stone-900 rounded-none text-amber-500 border border-stone-800">
-              <Landmark className="h-4.5 w-4.5" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-6 bg-[#F5F2EA] p-3.5 border border-[#1A1A1A]">
+          <div className="flex items-center space-x-3">
+            <div className="p-2 bg-[#1A1A1A] text-[#FBF9F5]">
+              <Landmark className="h-4 w-4" />
             </div>
             <div>
-              <div className="text-[9px] font-mono text-stone-400 font-bold uppercase tracking-wider">House of Representatives</div>
-              <div className="text-xs font-semibold text-stone-100 mt-0.5 flex items-center space-x-2">
-                <span>In recess (Resumes June 23)</span>
-                <span className="h-1.5 w-1.5 rounded-full bg-amber-500 inline-block animate-pulse"></span>
+              <div className="text-[9px] font-mono text-stone-600 font-bold uppercase tracking-widest">House of Representatives</div>
+              <div className="text-xs font-serif font-bold text-[#1A1A1A] mt-0.5 flex items-center space-x-2">
+                <span>Floor Proceedings Active</span>
+                <span className="h-2 w-2 rounded-full bg-emerald-600 inline-block animate-pulse"></span>
               </div>
             </div>
           </div>
 
-          <div className="flex items-center space-x-3.5 border-t sm:border-t-0 sm:border-l border-stone-800/85 pt-4 sm:pt-0 sm:pl-4">
-            <div className="p-2 bg-stone-900 rounded-none text-emerald-500 border border-stone-800">
-              <Landmark className="h-4.5 w-4.5" />
+          <div className="flex items-center space-x-3 border-t sm:border-t-0 sm:border-l border-stone-300 pt-3 sm:pt-0 sm:pl-4">
+            <div className="p-2 bg-[#1A1A1A] text-[#FBF9F5]">
+              <Landmark className="h-4 w-4" />
             </div>
             <div>
-              <div className="text-[9px] font-mono text-stone-400 font-bold uppercase tracking-wider">United States Senate</div>
-              <div className="text-xs font-semibold text-stone-100 mt-0.5 flex items-center space-x-2">
-                <span>Active Floor debates (119th Session)</span>
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 inline-block animate-pulse"></span>
+              <div className="text-[9px] font-mono text-stone-600 font-bold uppercase tracking-widest">United States Senate</div>
+              <div className="text-xs font-serif font-bold text-[#1A1A1A] mt-0.5 flex items-center space-x-2">
+                <span>Executive Session & Debates</span>
+                <span className="h-2 w-2 rounded-full bg-emerald-600 inline-block animate-pulse"></span>
               </div>
             </div>
           </div>
@@ -301,225 +324,274 @@ export default function Dashboard({
       </div>
 
       {/* ----------------------------------------------------
-          SUB-NAVIGATION (The four main modules)
+          SUB-NAVIGATION (Broadsheet Edition Tabs)
          ---------------------------------------------------- */}
-      <div className="flex flex-wrap border-b border-stone-200 bg-[#F9F8F6] p-1 rounded-none shadow-sm gap-1">
+      <div className="flex flex-wrap border-b-2 border-[#1A1A1A] bg-[#FAF7F0] p-1 gap-1">
         <button
           onClick={() => setActiveSubTab("daily")}
-          className={`flex-1 min-w-[150px] py-3 text-xs font-bold rounded-none transition-all flex items-center justify-center gap-2 cursor-pointer ${
+          className={`flex-1 min-w-[150px] py-2.5 text-xs font-mono font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-2 cursor-pointer ${
             activeSubTab === "daily"
-              ? "bg-stone-900 text-amber-500 shadow-sm"
-              : "text-stone-600 hover:text-stone-900 hover:bg-stone-50"
+              ? "bg-[#1A1A1A] text-[#FBF9F5] shadow-xs"
+              : "text-stone-800 hover:bg-stone-200/80"
           }`}
         >
           <Sparkles className="h-4 w-4" />
-          <span>Daily Briefing HQ</span>
+          <span>Daily Briefing Front Page</span>
         </button>
 
         <button
           onClick={() => setActiveSubTab("federal")}
-          className={`flex-1 min-w-[150px] py-3 text-xs font-bold rounded-none transition-all flex items-center justify-center gap-2 cursor-pointer ${
+          className={`flex-1 min-w-[150px] py-2.5 text-xs font-mono font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-2 cursor-pointer ${
             activeSubTab === "federal"
-              ? "bg-stone-900 text-amber-500 shadow-sm"
-              : "text-stone-600 hover:text-stone-900 hover:bg-stone-50"
+              ? "bg-[#1A1A1A] text-[#FBF9F5] shadow-xs"
+              : "text-stone-800 hover:bg-stone-200/80"
           }`}
         >
           <Landmark className="h-4 w-4" />
-          <span>Federal Gov & Committees</span>
+          <span>Committees & Jurisdiction</span>
         </button>
 
         <button
           onClick={() => setActiveSubTab("directory")}
-          className={`flex-1 min-w-[150px] py-3 text-xs font-bold rounded-none transition-all flex items-center justify-center gap-2 cursor-pointer ${
+          className={`flex-1 min-w-[150px] py-2.5 text-xs font-mono font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-2 cursor-pointer ${
             activeSubTab === "directory"
-              ? "bg-stone-900 text-amber-500 shadow-sm"
-              : "text-stone-600 hover:text-stone-900 hover:bg-stone-50"
+              ? "bg-[#1A1A1A] text-[#FBF9F5] shadow-xs"
+              : "text-stone-800 hover:bg-stone-200/80"
           }`}
         >
           <Users className="h-4 w-4" />
-          <span>Politicians Directory ({legislators.length})</span>
+          <span>Congressional Roster ({legislators.length})</span>
         </button>
       </div>
 
       {/* ----------------------------------------------------
-          TAB 0: DAILY BRIEFING HQ (FOCUSED THREE FEATURES)
+          TAB 0: DAILY BRIEFING HQ (3-COLUMN EDITORIAL FRONT PAGE)
          ---------------------------------------------------- */}
       {activeSubTab === "daily" && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-fade-in">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 animate-fade-in">
           
-          {/* Main Column (Daily Summary & Voted Bills) */}
-          <div className="lg:col-span-2 space-y-6">
-            
-            {/* FEATURE 1: SUMMARY OF CONGRESS DAY */}
-            <div className="bg-[#F9F8F6] border-2 border-stone-900 p-6 shadow-sm space-y-5">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-stone-100 pb-4">
-                <div className="space-y-1">
-                  <span className="text-[10px] font-mono font-bold text-amber-600 bg-amber-500/10 px-2.5 py-1 rounded-full uppercase tracking-wider">
-                    Today in Congress
-                  </span>
-                  <h2 className="text-lg font-sans font-extrabold text-stone-900 flex items-center gap-2 mt-1">
-                    <Activity className="h-5 w-5 text-amber-500 animate-pulse" />
-                    Daily Executive Summary
-                  </h2>
-                </div>
-                {dailyBrief && (
-                  <div className="flex items-center gap-2 self-start sm:self-center">
-                    <span className="text-[11px] font-mono font-bold text-stone-500">Media Focus Heat:</span>
-                    <div className="relative h-6 w-24 bg-stone-100 rounded-full overflow-hidden border border-stone-200">
-                      <div 
-                        className="h-full bg-gradient-to-r from-amber-500 to-red-500 rounded-full"
-                        style={{ width: `${dailyBrief.mediaHeat}%` }}
-                      ></div>
-                      <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-stone-700">
-                        {dailyBrief.mediaHeat}%
-                      </span>
+          {/* ====================================================
+              LEFT COLUMN (3 Cols): EXTRA! EXTRA! ROLL CALL BULLETINS
+             ==================================================== */}
+          <div className="lg:col-span-3 space-y-5 border-r-0 lg:border-r border-stone-300 lg:pr-5">
+            <div className="bg-[#FAF7F0] border-2 border-[#1A1A1A] p-4 shadow-2xs space-y-4">
+              <div className="border-b-2 border-[#1A1A1A] pb-2">
+                <span className="sepia-stamp-rose mb-1.5">
+                  ★ URGENT WIRE BULLETIN ★
+                </span>
+                <h3 className="text-sm font-headline font-black text-[#1A1A1A] uppercase tracking-wide mt-1">
+                  EXTRA! EXTRA! Roll Call Bulletins
+                </h3>
+                <p className="text-[11px] font-serif text-stone-600 mt-1 leading-snug">
+                  Breaking legislative votes, active floor roll calls, and committee tallies.
+                </p>
+              </div>
+
+              {/* Bulletins List */}
+              <div className="space-y-3 font-serif">
+                {accomplishments && accomplishments.length > 0 ? (
+                  accomplishments.slice(0, 4).map((item, i) => (
+                    <div 
+                      key={item.id}
+                      onClick={() => onSelectBill(item.id)}
+                      className="p-3 bg-[#F5F2EA] border border-[#1A1A1A] hover:bg-stone-200/60 transition-colors cursor-pointer space-y-1.5"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-mono font-bold text-[#1A1A1A] bg-stone-300/80 px-1.5 py-0.5">
+                          {item.id}
+                        </span>
+                        <span className="sepia-stamp-emerald text-[9px]">
+                          {item.outcome || "VOTED"}
+                        </span>
+                      </div>
+                      <h4 className="text-xs font-headline font-bold text-[#1A1A1A] leading-snug hover:underline">
+                        {item.title}
+                      </h4>
+                      <p className="text-[11px] text-stone-700 line-clamp-2 leading-relaxed">
+                        {item.synopsis}
+                      </p>
+                      <div className="pt-1.5 border-t border-stone-300 text-[9.5px] font-mono font-bold text-stone-600 flex justify-between items-center">
+                        <span>TALLY: PASS</span>
+                        <span className="text-amber-800 hover:underline flex items-center gap-0.5">
+                          Proof Sheet <ChevronRight className="h-3 w-3 inline" />
+                        </span>
+                      </div>
                     </div>
+                  ))
+                ) : (
+                  <div className="text-xs font-mono text-stone-500 italic p-4 text-center">
+                    Loading roll call wire...
                   </div>
                 )}
               </div>
 
+              {/* Extra Newspaper Box */}
+              <div className="p-3 bg-[#1A1A1A] text-[#FBF9F5] text-xs font-serif space-y-1.5">
+                <span className="text-[9px] font-mono font-bold text-amber-400 uppercase tracking-widest block">
+                  CAPITOL TELETYPE
+                </span>
+                <p className="text-[11px] text-stone-300 leading-snug">
+                  119th Congress floor debate schedule updated every hour via grounded GovTrack & Congress feeds.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* ====================================================
+              CENTER COLUMN (6 Cols): EXECUTIVE SUMMARY LEAD STORY WITH DROP CAPS
+             ==================================================== */}
+          <div className="lg:col-span-6 space-y-6">
+            <div className="bg-[#FAF7F0] border-2 border-[#1A1A1A] p-6 shadow-xs space-y-5">
+              
+              {/* Lead Story Header */}
+              <div className="border-b-4 border-double border-[#1A1A1A] pb-4 space-y-2">
+                <div className="flex items-center justify-between text-[10px] font-mono font-bold text-stone-700 uppercase tracking-widest">
+                  <span className="bg-[#1A1A1A] text-[#FBF9F5] px-2 py-0.5">FRONT PAGE LEAD STORY</span>
+                  <span>THE DAILY CIVIC WATCHDOG</span>
+                </div>
+
+                {dailyBrief ? (
+                  <h2 className="text-xl sm:text-2xl font-headline font-black text-[#1A1A1A] leading-tight mt-2">
+                    &ldquo;{dailyBrief.headline}&rdquo;
+                  </h2>
+                ) : (
+                  <h2 className="text-xl font-headline font-black text-[#1A1A1A]">
+                    Key Legislative Reform Active on Floor of the 119th Congress
+                  </h2>
+                )}
+              </div>
+
+              {/* Main Story Content with Drop Caps */}
               {loadingBrief ? (
-                <div className="py-16 text-center text-stone-500 flex flex-col items-center justify-center space-y-2">
-                  <RefreshCw className="h-8 w-8 text-amber-500 animate-spin" />
-                  <span className="text-xs font-semibold">Generating congressional briefing...</span>
+                <div className="py-12 text-center text-stone-600 flex flex-col items-center justify-center space-y-2">
+                  <RefreshCw className="h-8 w-8 text-[#1A1A1A] animate-spin" />
+                  <span className="text-xs font-mono font-bold">Press Bureau compiling lead story...</span>
                 </div>
               ) : dailyBrief ? (
-                <div className="space-y-4">
-                  <div className="p-4 bg-stone-50 border border-stone-200 rounded-none space-y-2">
-                    <h3 className="text-sm font-display font-black text-stone-900 leading-tight">
-                      &ldquo;{dailyBrief.headline}&rdquo;
-                    </h3>
-                    <p className="text-xs text-stone-600 leading-relaxed">
-                      {dailyBrief.summary}
-                    </p>
-                  </div>
+                <div className="space-y-4 font-serif text-sm text-[#1A1A1A]">
+                  
+                  {/* Lead Paragraph with Drop Cap */}
+                  <p className="drop-cap-lead text-stone-800 text-sm sm:text-base leading-relaxed font-serif">
+                    {dailyBrief.summary}
+                  </p>
 
-                  <div className="space-y-2.5">
-                    <h4 className="text-xs font-mono font-bold text-stone-400 uppercase tracking-wider flex items-center gap-1.5">
-                      <Sparkles className="h-3.5 w-3.5 text-amber-500" />
-                      Key Daily Takeaways
-                    </h4>
-                    <ul className="space-y-2 pl-1">
+                  {/* Editorial Analysis Breakdown */}
+                  <div className="p-4 bg-[#F5F2EA] border-l-4 border-[#1A1A1A] space-y-2 my-4">
+                    <h3 className="text-xs font-mono font-bold text-[#1A1A1A] uppercase tracking-wider flex items-center gap-1.5">
+                      <Sparkles className="h-3.5 w-3.5 text-amber-800" />
+                      Executive Summary & Key Takeaways
+                    </h3>
+                    <ul className="space-y-2 pt-1">
                       {dailyBrief.keyTakeaways.map((takeaway, idx) => (
-                        <li key={idx} className="flex items-start gap-2.5 text-xs text-stone-700 leading-relaxed">
-                          <span className="mt-1 h-1.5 w-1.5 rounded-full bg-amber-500 flex-shrink-0"></span>
+                        <li key={idx} className="flex items-start gap-2 text-xs font-serif text-stone-800 leading-relaxed">
+                          <span className="font-mono font-bold text-[#1A1A1A] shrink-0">[{idx + 1}]</span>
                           <span>{takeaway}</span>
                         </li>
                       ))}
                     </ul>
                   </div>
 
-                  <div className="pt-3 border-t border-stone-100">
-                    <h4 className="text-xs font-mono font-bold text-stone-400 uppercase tracking-wider mb-2.5">
-                      Today&apos;s Active Floor Agenda
-                    </h4>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  {/* Scheduled Floor Agenda */}
+                  <div className="pt-3 border-t-2 border-stone-300">
+                    <h3 className="text-xs font-headline font-extrabold text-[#1A1A1A] uppercase tracking-wider mb-3">
+                      Today&apos;s Active Floor Agenda & Hearings
+                    </h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       {dailyBrief.scheduledItems.map((item, idx) => (
-                        <div key={idx} className="p-3 bg-stone-50 border border-stone-150 rounded-none text-left flex flex-col justify-between hover:border-stone-300 transition-colors">
+                        <div key={idx} className="p-3 bg-[#F5F2EA] border border-[#1A1A1A] text-left flex flex-col justify-between">
                           <div className="space-y-1">
-                            <span className={`text-[9px] font-mono font-bold px-1.5 py-0.5 rounded uppercase leading-none ${
-                              item.chamber === "Senate" ? "bg-emerald-50 text-emerald-700 border border-emerald-100" : "bg-blue-50 text-blue-700 border border-blue-100"
-                            }`}>
-                              {item.chamber}
-                            </span>
-                            <p className="text-xs font-bold text-stone-800 line-clamp-2 mt-1 leading-snug">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 bg-[#1A1A1A] text-[#FBF9F5] uppercase">
+                                {item.chamber}
+                              </span>
+                              <span className="text-[9.5px] font-mono font-bold text-stone-600">{item.time}</span>
+                            </div>
+                            <p className="text-xs font-headline font-bold text-[#1A1A1A] mt-1 leading-snug">
                               {item.topic}
                             </p>
                           </div>
-                          <div className="mt-2.5 pt-2 border-t border-stone-200/50 flex items-center justify-between text-[10px]">
-                            <span className="text-stone-500 font-medium">{item.time}</span>
-                            <span className={`font-mono font-bold ${
-                              item.status === "Active Debate" || item.status === "Active Hearing" ? "text-amber-600 animate-pulse" : "text-emerald-600"
-                            }`}>{item.status}</span>
+                          <div className="mt-2 pt-2 border-t border-stone-300 flex items-center justify-between text-[10px] font-mono">
+                            <span className="sepia-stamp text-[8px]">{item.status}</span>
                           </div>
                         </div>
                       ))}
                     </div>
                   </div>
+
                 </div>
               ) : (
-                <div className="text-xs text-stone-400 italic text-center py-6">
+                <div className="text-xs font-mono text-stone-500 italic text-center py-6">
                   No briefing available.
                 </div>
               )}
-            </div>
 
-            {/* FEATURE 2: BILLS THAT WERE VOTED ON (CLICK TO LEARN) */}
-            <div className="bg-[#F9F8F6] border-2 border-stone-900 p-6 shadow-sm space-y-4">
-              <div className="flex items-center justify-between border-b border-stone-100 pb-3">
-                <div className="space-y-1">
-                  <h2 className="text-base font-display font-black text-stone-900 flex items-center gap-2">
-                    <BookmarkCheck className="h-5 w-5 text-amber-600" />
-                    Recently Voted Legislation
-                  </h2>
-                  <p className="text-xs text-stone-500">
-                    Click any bill to read a plain-language summary, financial impact, and bipartisan consensus scorecards.
-                  </p>
+              {/* Recently Voted Legislation Feature */}
+              <div className="pt-4 border-t-4 border-double border-[#1A1A1A] space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-headline font-black text-[#1A1A1A]">
+                    Featured Legislative Enactments
+                  </h3>
+                  <span className="text-[10px] font-mono text-stone-600 uppercase font-bold">CLICK TO INSPECT</span>
+                </div>
+
+                <div className="space-y-2.5">
+                  {accomplishments && accomplishments.length > 0 ? (
+                    accomplishments.slice(0, 3).map((item) => (
+                      <div
+                        key={item.id}
+                        onClick={() => onSelectBill(item.id)}
+                        className="group p-3.5 bg-[#F5F2EA] hover:bg-stone-200/70 border border-[#1A1A1A] transition-all cursor-pointer flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3"
+                      >
+                        <div className="space-y-1 flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] font-mono font-bold text-[#1A1A1A] bg-stone-300 px-1.5 py-0.5">
+                              {item.id}
+                            </span>
+                            <span className="text-[9px] font-mono text-stone-700 font-bold uppercase">
+                              {item.category}
+                            </span>
+                          </div>
+                          <h4 className="text-xs font-headline font-extrabold text-[#1A1A1A] group-hover:underline truncate">
+                            {item.title}
+                          </h4>
+                          <p className="text-[11px] font-serif text-stone-700 line-clamp-1 leading-snug">
+                            {item.synopsis}
+                          </p>
+                        </div>
+                        <div className="sepia-stamp-emerald shrink-0">
+                          PROOF SHEET →
+                        </div>
+                      </div>
+                    ))
+                  ) : null}
                 </div>
               </div>
 
-              <div className="space-y-3">
-                {accomplishments && accomplishments.length > 0 ? (
-                  accomplishments.slice(0, 3).map((item) => (
-                    <div
-                      key={item.id}
-                      onClick={() => onSelectBill(item.id)}
-                      className="group p-4 bg-stone-50 hover:bg-stone-100 border border-stone-200 hover:border-stone-350 rounded-none transition-all cursor-pointer flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shadow-2xs"
-                    >
-                      <div className="space-y-1.5 flex-1 min-w-0">
-                        <div className="flex flex-wrap items-center gap-1.5">
-                          <span className="text-[10px] font-mono font-bold text-amber-600 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/15">
-                            {item.id}
-                          </span>
-                          <span className="text-[9.5px] font-mono bg-stone-200 text-stone-700 px-1.5 py-0.5 rounded font-semibold">
-                            {item.category}
-                          </span>
-                          <span className="text-[9.5px] font-mono bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded font-bold border border-emerald-100">
-                            {item.outcome}
-                          </span>
-                        </div>
-                        <h3 className="text-sm font-bold text-stone-900 group-hover:text-amber-600 transition-colors truncate">
-                          {item.title}
-                        </h3>
-                        <p className="text-xs text-stone-500 line-clamp-1 leading-normal">
-                          {item.synopsis}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-2 self-end md:self-center">
-                        <span className="text-[11px] font-semibold text-stone-500">Learn more</span>
-                        <ChevronRight className="h-4 w-4 text-stone-400 group-hover:transtone-x-1 transition-transform" />
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <div className="py-10 text-center text-xs text-stone-400 italic">
-                    Loading recently voted bills...
-                  </div>
-                )}
-              </div>
             </div>
-
           </div>
 
-          {/* Sidebar Column (FEATURE 3: KEY ISSUES TRACKED) */}
-          <div className="space-y-6">
-            
-            {/* KEY ISSUES TRACKER */}
-            <div className="bg-[#F9F8F6] border-2 border-stone-900 p-5 shadow-sm space-y-4">
-              <div className="space-y-1">
-                <h3 className="text-sm font-display font-black text-stone-900 flex items-center gap-1.5">
-                  <Layers className="h-4.5 w-4.5 text-amber-600" />
-                  Key Ongoing Issues
+          {/* ====================================================
+              RIGHT COLUMN (3 Cols): EDITORIAL BOARD CONSENSUS SCORES
+             ==================================================== */}
+          <div className="lg:col-span-3 space-y-5 border-l-0 lg:border-l border-stone-300 lg:pl-5">
+            <div className="bg-[#FAF7F0] border-2 border-[#1A1A1A] p-4 shadow-2xs space-y-4">
+              
+              <div className="border-b-2 border-[#1A1A1A] pb-2">
+                <span className="sepia-stamp text-[9px] mb-1.5">
+                  CIVIC SCORECARD
+                </span>
+                <h3 className="text-sm font-headline font-black text-[#1A1A1A] uppercase tracking-wide mt-1">
+                  Editorial Board Consensus Scores
                 </h3>
-                <p className="text-[11px] text-stone-500">
-                  Select and follow the most critical, fast-moving policies and debates being actively worked on in Congress.
+                <p className="text-[11px] font-serif text-stone-600 mt-1 leading-snug">
+                  Bipartisan alignment index and public interest sentiment scores on active issues.
                 </p>
               </div>
 
+              {/* Key Issues Tracker with Editorial Consensus Meters */}
               {loadingIssues ? (
-                <div className="py-12 text-center text-stone-500 flex flex-col items-center justify-center space-y-2">
-                  <RefreshCw className="h-6 w-6 text-amber-500 animate-spin" />
-                  <span className="text-xs font-semibold">Syncing legislative agendas...</span>
+                <div className="py-10 text-center text-stone-500 font-mono text-xs italic">
+                  Syncing consensus metrics...
                 </div>
               ) : keyIssues.length > 0 ? (
                 <div className="space-y-3.5">
@@ -528,65 +600,62 @@ export default function Dashboard({
                     return (
                       <div 
                         key={issue.id}
-                        className={`p-3.5 rounded-none border transition-all space-y-3 ${
+                        className={`p-3 border transition-all space-y-2.5 font-serif ${
                           isFollowed 
-                            ? "bg-amber-500/[0.02] border-amber-500/40" 
-                            : "bg-stone-50 border-stone-200 hover:border-stone-300"
+                            ? "bg-[#F5F2EA] border-2 border-[#1A1A1A]" 
+                            : "bg-[#FAF7F0] border border-stone-300 hover:border-[#1A1A1A]"
                         }`}
                       >
                         <div className="flex items-start justify-between gap-2">
                           <div>
-                            <span className="text-[8.5px] font-mono font-bold uppercase tracking-widest px-1.5 py-0.5 rounded bg-stone-200 text-stone-600">
+                            <span className="text-[8.5px] font-mono font-bold uppercase tracking-wider px-1.5 py-0.5 bg-[#1A1A1A] text-[#FBF9F5]">
                               {issue.category}
                             </span>
-                            <h4 className="text-xs font-extrabold text-stone-900 mt-1.5 leading-snug">{issue.title}</h4>
+                            <h4 className="text-xs font-headline font-bold text-[#1A1A1A] mt-1.5 leading-snug">
+                              {issue.title}
+                            </h4>
                           </div>
                           <button
                             onClick={() => toggleFollowIssue(issue.id)}
-                            className={`p-1.5 rounded-none border transition-all cursor-pointer ${
+                            className={`p-1 border transition-all cursor-pointer ${
                               isFollowed
-                                ? "bg-amber-500/15 border-amber-500/35 text-amber-600"
-                                : "bg-[#F9F8F6] border-stone-200 text-stone-400 hover:text-stone-600"
+                                ? "bg-[#1A1A1A] text-amber-400 border-[#1A1A1A]"
+                                : "bg-stone-100 border-stone-300 text-stone-500 hover:text-stone-900"
                             }`}
-                            title={isFollowed ? "Unfollow key issue" : "Follow key issue"}
+                            title={isFollowed ? "Unfollow issue" : "Follow issue"}
                           >
-                            <Star className={`h-3.5 w-3.5 ${isFollowed ? "fill-amber-500" : ""}`} />
+                            <Star className={`h-3 w-3 ${isFollowed ? "fill-amber-400" : ""}`} />
                           </button>
                         </div>
 
-                        <p className="text-[11px] text-stone-600 leading-relaxed">
+                        <p className="text-[11px] text-stone-700 leading-relaxed">
                           {issue.description}
                         </p>
 
-                        <div className="space-y-1.5">
-                          <div className="flex items-center justify-between text-[10px]">
-                            <span className="font-mono font-bold text-stone-400 uppercase tracking-wider">Consensus Score:</span>
-                            <span className="font-bold text-stone-800">{issue.consensus}%</span>
+                        {/* Editorial Consensus Meter */}
+                        <div className="space-y-1 pt-1 border-t border-stone-300/80">
+                          <div className="flex items-center justify-between text-[10px] font-mono font-bold">
+                            <span className="text-stone-600 uppercase">Consensus Index:</span>
+                            <span className="text-[#1A1A1A]">{issue.consensus}%</span>
                           </div>
-                          <div className="h-1.5 w-full bg-stone-200 rounded-full overflow-hidden">
+                          <div className="h-2 w-full bg-stone-200 border border-stone-400">
                             <div 
-                              className="h-full bg-amber-500 rounded-full" 
+                              className="h-full bg-[#1A1A1A]" 
                               style={{ width: `${issue.consensus}%` }}
                             ></div>
                           </div>
                         </div>
 
-                        {/* Collapsible Arguments or Latest Action for Followed Issues */}
+                        {/* Collapsible Viewpoints */}
                         {isFollowed && (
-                          <div className="pt-2.5 border-t border-stone-200/60 space-y-2 text-[10px] leading-relaxed animate-fade-in">
-                            <div className="bg-[#F9F8F6] p-2.5 rounded border border-stone-150 space-y-1">
-                              <span className="font-bold text-stone-800 block uppercase font-mono tracking-wider text-[8px]">Latest active action:</span>
-                              <p className="text-stone-600 italic leading-snug">{issue.latestMovement}</p>
+                          <div className="pt-2 border-t border-stone-300 space-y-2 text-[10px] animate-fade-in">
+                            <div className="bg-[#FAF7F0] p-2 border border-stone-300">
+                              <span className="font-mono font-bold text-[#1A1A1A] block uppercase text-[8px]">PRO ARGUMENT:</span>
+                              <p className="text-stone-700 italic mt-0.5">{issue.viewpoints.pro}</p>
                             </div>
-                            <div className="grid grid-cols-2 gap-2 mt-1">
-                              <div className="p-2 bg-emerald-500/[0.03] border border-emerald-500/15 rounded">
-                                <span className="font-bold text-emerald-800 block text-[9px] uppercase tracking-wider">Pro View:</span>
-                                <p className="text-stone-500 mt-0.5 text-[9px] leading-normal line-clamp-3" title={issue.viewpoints.pro}>{issue.viewpoints.pro}</p>
-                              </div>
-                              <div className="p-2 bg-rose-500/[0.03] border border-rose-500/15 rounded">
-                                <span className="font-bold text-rose-800 block text-[9px] uppercase tracking-wider">Con View:</span>
-                                <p className="text-stone-500 mt-0.5 text-[9px] leading-normal line-clamp-3" title={issue.viewpoints.con}>{issue.viewpoints.con}</p>
-                              </div>
+                            <div className="bg-[#FAF7F0] p-2 border border-stone-300">
+                              <span className="font-mono font-bold text-[#1A1A1A] block uppercase text-[8px]">CON ARGUMENT:</span>
+                              <p className="text-stone-700 italic mt-0.5">{issue.viewpoints.con}</p>
                             </div>
                           </div>
                         )}
@@ -594,23 +663,19 @@ export default function Dashboard({
                     );
                   })}
                 </div>
-              ) : (
-                <div className="text-xs text-stone-400 italic text-center py-6">
-                  No issues loaded.
-                </div>
-              )}
-            </div>
+              ) : null}
 
-            {/* Civics Tip Card */}
-            <div className="bg-gradient-to-r from-amber-500/10 to-red-500/10 rounded-none border border-amber-500/15 p-5 space-y-3 shadow-2xs">
-              <span className="font-bold text-amber-800 text-xs flex items-center gap-1">
-                <Zap className="h-4 w-4 fill-amber-500 text-amber-500" /> Grounded Integrity
-              </span>
-              <p className="text-[11px] text-stone-700 leading-relaxed">
-                Our tracking models utilize direct, un-biased grounding feeds to summarize the actual arguments from both sides of the aisle. We avoid opinionated commentary to help you understand public policy.
-              </p>
-            </div>
+              {/* Non-partisan Press Notice */}
+              <div className="p-3 bg-[#F5F2EA] border border-stone-400 text-[10.5px] font-serif text-stone-800 space-y-1">
+                <span className="font-mono font-bold text-[#1A1A1A] block uppercase text-[9px]">
+                  EDITORIAL STANDARDS
+                </span>
+                <p className="leading-snug">
+                  The Citizens Sentinel reports un-biased legislative parameters direct from official congressional journals.
+                </p>
+              </div>
 
+            </div>
           </div>
 
         </div>
@@ -827,7 +892,7 @@ export default function Dashboard({
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
               {/* Search input */}
               <div className="relative lg:col-span-2">
                 <Search className="absolute left-3 top-2.5 h-4 w-4 text-stone-400" />
@@ -847,9 +912,9 @@ export default function Dashboard({
                   onChange={(e) => setChamberFilter(e.target.value as any)}
                   className="w-full bg-stone-50 border border-stone-250 rounded-none py-2 px-3 text-xs font-semibold focus:outline-none focus:border-amber-500 transition-all"
                 >
-                  <option value="ALL">All Chambers (House & Senate)</option>
-                  <option value="House">House of Representatives</option>
-                  <option value="Senate">United States Senate</option>
+                  <option value="ALL">All Chambers</option>
+                  <option value="House">House</option>
+                  <option value="Senate">Senate</option>
                 </select>
               </div>
 
@@ -877,6 +942,20 @@ export default function Dashboard({
                   {Object.entries(STATE_NAMES).map(([code, name]) => (
                     <option key={code} value={code}>{code} - {name}</option>
                   ))}
+                </select>
+              </div>
+
+              {/* Sort selector */}
+              <div>
+                <select
+                  value={sortFilter}
+                  onChange={(e) => setSortFilter(e.target.value as any)}
+                  className="w-full bg-stone-50 border border-stone-250 rounded-none py-2 px-3 text-xs font-semibold text-amber-700 focus:outline-none focus:border-amber-500 transition-all"
+                >
+                  <option value="NAME">Sort: Name (A-Z)</option>
+                  <option value="WORST_GRADE">Sort: Worst Index Grade First</option>
+                  <option value="BEST_GRADE">Sort: Best Index Grade First</option>
+                  <option value="ATTENDANCE">Sort: Highest Attendance</option>
                 </select>
               </div>
             </div>
@@ -1001,6 +1080,17 @@ export default function Dashboard({
                             </div>
                           )}
                         </div>
+
+                        {/* Ask AI About Politician Button */}
+                        {onNavigateToTab && (
+                          <button
+                            onClick={() => onNavigateToTab("chat")}
+                            className="mt-2.5 w-full flex items-center justify-center gap-1.5 bg-blue-50 hover:bg-blue-100 text-blue-800 border border-blue-200 text-[10px] font-bold py-1.5 px-2 transition-colors cursor-pointer"
+                          >
+                            <HelpCircle className="h-3.5 w-3.5 text-blue-600" />
+                            <span>Ask AI About {leg.name.split(' ').slice(-1)[0]}'s Grade & Record</span>
+                          </button>
+                        )}
                       </div>
 
                       <div className="mt-5 pt-3.5 border-t border-stone-100 flex items-center justify-between text-[10.5px]">
