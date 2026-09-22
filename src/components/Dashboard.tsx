@@ -150,10 +150,14 @@ export default function Dashboard({
       try {
         setLoadingBrief(true);
         const resp = await fetch("/api/legislation/daily-brief");
-        const json = await resp.json();
-        setDailyBrief(json.data);
+        if (resp.ok) {
+          const json = await resp.json();
+          if (json && json.data) {
+            setDailyBrief(json.data);
+          }
+        }
       } catch (err) {
-        console.error("Failed to load daily brief:", err);
+        console.warn("Daily brief fetch notice:", err);
       } finally {
         setLoadingBrief(false);
       }
@@ -163,10 +167,14 @@ export default function Dashboard({
       try {
         setLoadingIssues(true);
         const resp = await fetch("/api/legislation/key-issues");
-        const json = await resp.json();
-        setKeyIssues(json.data || []);
+        if (resp.ok) {
+          const json = await resp.json();
+          if (json && Array.isArray(json.data)) {
+            setKeyIssues(json.data);
+          }
+        }
       } catch (err) {
-        console.error("Failed to load key issues:", err);
+        console.warn("Key issues fetch notice:", err);
       } finally {
         setLoadingIssues(false);
       }
@@ -197,10 +205,12 @@ export default function Dashboard({
       try {
         setLoadingLegs(true);
         const resp = await fetch("/api/legislation/legislators");
-        const resJson = await resp.json();
-        setLegislators(resJson.data || []);
+        if (resp.ok) {
+          const resJson = await resp.json();
+          setLegislators(resJson.data || []);
+        }
       } catch (err) {
-        console.error("Failed to load legislators in dashboard widget:", err);
+        console.warn("Legislators load notice in dashboard:", err);
       } finally {
         setLoadingLegs(false);
       }

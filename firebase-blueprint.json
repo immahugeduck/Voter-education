@@ -1,33 +1,78 @@
 {
-  "projectInfo": {
-    "name": "CapitolTrack",
-    "description": "Civic engagement app tracking congressional bills and citizen consensus."
-  },
-  "collections": [
-    {
-      "name": "users",
-      "description": "Stores user profiles, location data, and preferences.",
-      "securityRules": "Users can only read and write their own profile.",
-      "fields": [
-        { "name": "uid", "type": "string", "description": "Firebase Auth UID" },
-        { "name": "email", "type": "string", "description": "User email address" },
-        { "name": "displayName", "type": "string", "description": "User's display name" },
-        { "name": "address", "type": "string", "description": "User's registered address for civic API lookups" },
-        { "name": "state", "type": "string", "description": "State abbreviation for local representative filtering" },
-        { "name": "createdAt", "type": "timestamp", "description": "Account creation time" },
-        { "name": "updatedAt", "type": "timestamp", "description": "Last profile update time" }
-      ]
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile with civic address and notification preferences",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "maxLength": 128 },
+        "email": { "type": "string", "maxLength": 256 },
+        "displayName": { "type": "string", "maxLength": 256 },
+        "address": { "type": "string", "maxLength": 512 },
+        "state": { "type": "string", "maxLength": 10 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email"]
     },
-    {
-      "name": "votes",
-      "description": "Stores citizen votes on specific bills.",
-      "securityRules": "Users can only read and write their own votes. Aggregated views can be calculated server-side.",
-      "fields": [
-        { "name": "userId", "type": "string", "description": "Reference to the user UID" },
-        { "name": "billId", "type": "string", "description": "The ID of the bill (e.g., H.R. 6090)" },
-        { "name": "vote", "type": "string", "description": "The user's vote, e.g., 'yea' or 'nay'" },
-        { "name": "timestamp", "type": "timestamp", "description": "Time the vote was cast" }
-      ]
+    "Vote": {
+      "title": "Vote",
+      "description": "Citizen vote on specific congressional bill",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "maxLength": 128 },
+        "billId": { "type": "string", "maxLength": 128 },
+        "vote": { "type": "string", "enum": ["yea", "nay"] },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "billId", "vote"]
+    },
+    "BaselineData": {
+      "title": "BaselineData",
+      "description": "Persistent baseline congressional data (bills, votes, alerts, sessions) stored as daily fallback",
+      "type": "object",
+      "properties": {
+        "dataType": { "type": "string", "enum": ["bills", "votes", "accomplishments", "sessions", "alerts"] },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "backupDate": { "type": "string", "maxLength": 32 },
+        "itemsCount": { "type": "number" },
+        "source": { "type": "string", "maxLength": 128 },
+        "data": { "type": "array" }
+      },
+      "required": ["dataType", "backupDate", "itemsCount"]
+    },
+    "DailyBackup": {
+      "title": "DailyBackup",
+      "description": "Snapshot of congressional baseline state taken daily to prevent stale fallbacks",
+      "type": "object",
+      "properties": {
+        "backupId": { "type": "string", "maxLength": 64 },
+        "backupDate": { "type": "string", "maxLength": 32 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "triggeredBy": { "type": "string", "maxLength": 128 },
+        "billsCount": { "type": "number" },
+        "votesCount": { "type": "number" },
+        "status": { "type": "string", "maxLength": 32 }
+      },
+      "required": ["backupId", "backupDate", "billsCount", "votesCount"]
     }
-  ]
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "Stores user profile and preferences"
+    },
+    "/votes/{voteId}": {
+      "schema": "Vote",
+      "description": "Stores citizen votes on congressional legislation"
+    },
+    "/baseline_data/{dataType}": {
+      "schema": "BaselineData",
+      "description": "Stores current baseline records for bills and voting to prevent stale API fallbacks"
+    },
+    "/daily_backups/{backupId}": {
+      "schema": "DailyBackup",
+      "description": "Daily backup archive keeping historical legislative snapshots"
+    }
+  }
 }

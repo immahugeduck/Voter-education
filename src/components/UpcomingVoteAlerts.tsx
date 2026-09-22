@@ -16,21 +16,27 @@ export default function UpcomingVoteAlerts() {
         setLoading(true);
         // Load Alerts
         const resAlerts = await fetch("/api/legislation/alerts");
-        const alertsJson = await resAlerts.json();
-        setAlerts(alertsJson.data);
+        if (resAlerts.ok) {
+          const alertsJson = await resAlerts.json();
+          if (alertsJson && alertsJson.data) {
+            setAlerts(alertsJson.data);
+          }
+        }
 
         // Load Legislators to support selectors
         const resLegs = await fetch("/api/legislation/legislators");
-        const legsJson = await resLegs.json();
-        setLegislators(legsJson.data || []);
-        if (legsJson.data && legsJson.data.length > 0) {
-          const hasDefault = legsJson.data.some((l: any) => l.id === "leg-1");
-          if (!hasDefault) {
-            setSelectedLegId(legsJson.data[0].id);
+        if (resLegs.ok) {
+          const legsJson = await resLegs.json();
+          setLegislators(legsJson.data || []);
+          if (legsJson.data && legsJson.data.length > 0) {
+            const hasDefault = legsJson.data.some((l: any) => l.id === "leg-1");
+            if (!hasDefault) {
+              setSelectedLegId(legsJson.data[0].id);
+            }
           }
         }
       } catch (err) {
-        console.error("Failed to load alerts & legislators:", err);
+        console.warn("Alerts & legislators notice:", err);
       } finally {
         setLoading(false);
       }

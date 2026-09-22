@@ -153,7 +153,7 @@ export default function CitizensConsensus({ followedLegislators = [] }: Citizens
                 localStorage.setItem("capitoltrack_user_votes", JSON.stringify(cloudVotes));
              }
           } catch (e) {
-             console.error("Error fetching votes from Firebase", e);
+             console.warn("Firebase votes load notice:", e);
           }
        }
     };
@@ -166,10 +166,11 @@ export default function CitizensConsensus({ followedLegislators = [] }: Citizens
       try {
         setLoading(true);
         const res = await fetch("/api/legislation/legislators");
+        if (!res.ok) return;
         const json = await res.json();
         setLegislators(json.data || []);
       } catch (err) {
-        console.error("Failed to load legislators for matching:", err);
+        console.warn("Legislators matching load notice:", err);
       } finally {
         setLoading(false);
       }
@@ -209,7 +210,7 @@ export default function CitizensConsensus({ followedLegislators = [] }: Citizens
           timestamp: serverTimestamp()
         }, { merge: true });
       } catch (err) {
-        console.error("Failed to sync vote to Firebase:", err);
+        console.warn("Vote sync to Firebase notice:", err);
       }
     }
   };

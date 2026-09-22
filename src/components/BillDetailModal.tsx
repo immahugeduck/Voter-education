@@ -60,14 +60,14 @@ export default function BillDetailModal({ billId, onClose }: BillDetailModalProp
                   // Ignore partial parsing errors
                 }
               } catch (e) {
-                console.error("Failed to parse SSE line", e);
+                console.warn("SSE line notice:", e);
               }
             }
           }
         }
       } catch (err: any) {
         if (active) {
-          console.error(err);
+          console.warn("Bill summarize stream notice:", err);
           setError(err.message || "Unable to synthesize the requested bill. Please check your network connection.");
         }
       } finally {
@@ -150,7 +150,7 @@ How can I help you understand this bill today?`,
       };
       setMessages(prev => [...prev, responseMsg]);
     } catch (err: any) {
-      console.error(err);
+      console.warn("Bill chat query notice:", err);
       setMessages(prev => [
         ...prev,
         {

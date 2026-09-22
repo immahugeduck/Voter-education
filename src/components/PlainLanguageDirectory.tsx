@@ -2,6 +2,8 @@ import React, { useState, useEffect } from "react";
 import { FileText, Search, Sparkles, BookOpen, User, HelpCircle, Loader2, ArrowRightLeft, FileCode2, Send, CheckCircle2, RotateCcw } from "lucide-react";
 import { SearchedBill } from "../types";
 import { parse as parsePartialJson } from "partial-json";
+import { getFirebaseBaseline } from "../services/firebaseBackupService";
+import FirebaseBaselineBackupCard from "./FirebaseBaselineBackupCard";
 
 interface PlainLanguageDirectoryProps {
   onSelectBill: (id: string) => void;
@@ -28,18 +30,56 @@ export default function PlainLanguageDirectory({ onSelectBill }: PlainLanguageDi
     try {
       setLoading(true);
       const resp = await fetch(`/api/legislation/search?q=${encodeURIComponent(queryText)}`);
-      const data = await resp.json();
-      const parsed = data.data.map((item: any) => ({
-        id: item.id || item.billId || "H.R. 4000",
-        title: item.title || item.officialTitle,
-        sponsor: item.sponsor || item.sponsorName || "Congressional Committee",
-        status: item.status || item.outcome,
-        oneLiner: item.oneLiner || item.synopsis,
-        category: item.category
-      }));
-      setBills(parsed);
+      if (resp.ok) {
+        const data = await resp.json();
+        if (data && Array.isArray(data.data) && data.data.length > 0) {
+          const parsed = data.data.map((item: any) => ({
+            id: item.id || item.billId || "H.R. 4000",
+            title: item.title || item.officialTitle,
+            sponsor: item.sponsor || item.sponsorName || "Congressional Committee",
+            status: item.status || item.outcome,
+            oneLiner: item.oneLiner || item.synopsis,
+            category: item.category
+          }));
+          setBills(parsed);
+          return;
+        }
+      }
+      // If search failed or empty, fallback to Firebase baseline
+      const fbBaseline = await getFirebaseBaseline<any>("accomplishments");
+      if (fbBaseline && fbBaseline.length > 0) {
+        const filtered = queryText.trim()
+          ? fbBaseline.filter((b: any) =>
+              (b.title || "").toLowerCase().includes(queryText.toLowerCase()) ||
+              (b.id || "").toLowerCase().includes(queryText.toLowerCase()) ||
+              (b.synopsis || "").toLowerCase().includes(queryText.toLowerCase())
+            )
+          : fbBaseline;
+
+        const parsed = (filtered.length ? filtered : fbBaseline).map((item: any) => ({
+          id: item.id || item.billId || "H.R. 4000",
+          title: item.title || item.officialTitle,
+          sponsor: item.sponsor || item.sponsorName || "Congressional Committee",
+          status: item.status || item.outcome,
+          oneLiner: item.oneLiner || item.synopsis,
+          category: item.category
+        }));
+        setBills(parsed);
+      }
     } catch (err) {
-      console.error(err);
+      console.warn("Legislation search notice, falling back to Firebase baseline:", err);
+      const fbBaseline = await getFirebaseBaseline<any>("accomplishments");
+      if (fbBaseline && fbBaseline.length > 0) {
+        const parsed = fbBaseline.map((item: any) => ({
+          id: item.id || item.billId || "H.R. 4000",
+          title: item.title || item.officialTitle,
+          sponsor: item.sponsor || item.sponsorName || "Congressional Committee",
+          status: item.status || item.outcome,
+          oneLiner: item.oneLiner || item.synopsis,
+          category: item.category
+        }));
+        setBills(parsed);
+      }
     } finally {
       setLoading(false);
     }
@@ -98,13 +138,13 @@ export default function PlainLanguageDirectory({ onSelectBill }: PlainLanguageDi
                 // Ignore partial parse error
               }
             } catch (e) {
-              console.error("Failed to parse SSE", e);
+              console.warn("SSE chunk notice:", e);
             }
           }
         }
       }
     } catch (err) {
-      console.error(err);
+      console.warn("Custom summary stream notice:", err);
     } finally {
       setCustomLoading(false);
     }
@@ -153,6 +193,9 @@ export default function PlainLanguageDirectory({ onSelectBill }: PlainLanguageDi
 
       {activeSubTab === "directory" ? (
         <>
+          {/* Firebase Baseline Resilience Indicator */}
+          <FirebaseBaselineBackupCard compact className="mb-4" onBackupComplete={() => performSearch(searchQuery)} />
+
           {/* Search Header */}
           <div className="bg-[#F9F8F6] rounded-none border border-stone-200 p-6 shadow-sm">
             <h2 className="text-xl font-display font-black text-stone-900 flex items-center gap-2">

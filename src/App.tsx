@@ -14,6 +14,7 @@ import ApiDiagnosticsModal from "./components/ApiDiagnosticsModal";
 import MySquadDashboard from "./components/MySquadDashboard";
 import { Accomplishment, LegislativeSession, RollCallVote } from "./types";
 import { Landmark, Calendar, Settings, ArrowUpRight } from "lucide-react";
+import { getFirebaseBaseline, saveFirebaseBaseline } from "./services/firebaseBackupService";
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<string>("dashboard");
@@ -67,29 +68,31 @@ export default function App() {
 
     // Attempt automatic geolocation on startup if user hasn't selected one previously
     const hasStoredState = localStorage.getItem("capitol_user_local_state");
-    if (!hasStoredState && navigator.geolocation) {
+    if (!hasStoredState && typeof navigator !== "undefined" && navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         async (position) => {
           const { latitude, longitude } = position.coords;
           try {
             const response = await fetch(
-              `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=en`
+              `/api/civic/reverse-geocode?lat=${latitude}&lon=${longitude}`
             );
+            if (!response.ok) return;
             const data = await response.json();
-            if (data && data.principalSubdivisionCode) {
-              const code = data.principalSubdivisionCode.replace("US-", "");
+            if (data && data.state) {
+              const code = data.state.toUpperCase();
               if (code && code.length === 2) {
-                handleStateChange(code.toUpperCase());
+                handleStateChange(code);
                 console.log("Automatically set home state based on geolocation:", code);
               }
             }
           } catch (err) {
-            console.error("Reverse geocoding error:", err);
+            console.warn("Reverse geocoding notice:", err);
           }
         },
         (err) => {
-          console.warn("Geolocation prompt declined or error occurred:", err);
-        }
+          console.warn("Geolocation prompt declined or unavailable:", err?.message || err);
+        },
+        { timeout: 5000, maximumAge: 3600000 }
       );
     }
 
@@ -126,15 +129,28 @@ export default function App() {
     try {
       setLoadingAccomplishments(true);
       const resp = await fetch("/api/legislation/accomplishments");
-      const resJson = await resp.json();
-      setAccomplishments(resJson.data);
-      if (resJson.source === "cache" || resJson.source === "fallback") {
-        setIsLive(false);
-      } else {
+      if (resp.ok) {
+        const resJson = await resp.json();
+        if (resJson && resJson.data && resJson.data.length > 0) {
+          setAccomplishments(resJson.data);
+          setIsLive(resJson.source !== "cache" && resJson.source !== "fallback");
+          saveFirebaseBaseline("accomplishments", resJson.data, "client_sync");
+          return;
+        }
+      }
+      // If server response is empty or failed, fetch baseline directly from Firestore
+      const fbBaseline = await getFirebaseBaseline<Accomplishment>("accomplishments");
+      if (fbBaseline && fbBaseline.length > 0) {
+        setAccomplishments(fbBaseline);
         setIsLive(true);
       }
     } catch (err) {
-      console.error(err);
+      console.warn("Accomplishments load notice, checking Firebase baseline:", err);
+      const fbBaseline = await getFirebaseBaseline<Accomplishment>("accomplishments");
+      if (fbBaseline && fbBaseline.length > 0) {
+        setAccomplishments(fbBaseline);
+        setIsLive(true);
+      }
     } finally {
       setLoadingAccomplishments(false);
     }
@@ -144,10 +160,25 @@ export default function App() {
     try {
       setLoadingSessions(true);
       const resp = await fetch("/api/legislation/sessions");
-      const resJson = await resp.json();
-      setSessions(resJson.data);
+      if (resp.ok) {
+        const resJson = await resp.json();
+        if (resJson && resJson.data && resJson.data.length > 0) {
+          setSessions(resJson.data);
+          saveFirebaseBaseline("sessions", resJson.data, "client_sync");
+          return;
+        }
+      }
+      // Fall back to Firestore baseline
+      const fbBaseline = await getFirebaseBaseline<LegislativeSession>("sessions");
+      if (fbBaseline && fbBaseline.length > 0) {
+        setSessions(fbBaseline);
+      }
     } catch (err) {
-      console.error(err);
+      console.warn("Sessions load notice, checking Firebase baseline:", err);
+      const fbBaseline = await getFirebaseBaseline<LegislativeSession>("sessions");
+      if (fbBaseline && fbBaseline.length > 0) {
+        setSessions(fbBaseline);
+      }
     } finally {
       setLoadingSessions(false);
     }
@@ -157,10 +188,25 @@ export default function App() {
     try {
       setLoadingVotes(true);
       const resp = await fetch("/api/legislation/votes");
-      const resJson = await resp.json();
-      setVotes(resJson.data);
+      if (resp.ok) {
+        const resJson = await resp.json();
+        if (resJson && resJson.data && resJson.data.length > 0) {
+          setVotes(resJson.data);
+          saveFirebaseBaseline("votes", resJson.data, "client_sync");
+          return;
+        }
+      }
+      // Fall back to Firestore baseline
+      const fbBaseline = await getFirebaseBaseline<RollCallVote>("votes");
+      if (fbBaseline && fbBaseline.length > 0) {
+        setVotes(fbBaseline);
+      }
     } catch (err) {
-      console.error(err);
+      console.warn("Votes load notice, checking Firebase baseline:", err);
+      const fbBaseline = await getFirebaseBaseline<RollCallVote>("votes");
+      if (fbBaseline && fbBaseline.length > 0) {
+        setVotes(fbBaseline);
+      }
     } finally {
       setLoadingVotes(false);
     }

@@ -16,13 +16,14 @@ export default function MySquadDashboard({ followedLegislators, toggleFollowLegi
     async function loadSquad() {
       try {
         setLoading(true);
-        const res = await fetch(`/api/legislation/state-legislators?state=ALL`);
+        const res = await fetch(`/api/legislation/legislators`);
+        if (!res.ok) return;
         const json = await res.json();
         const allLegs: LegislatorScorecard[] = json.data || [];
         const drafted = allLegs.filter(l => followedLegislators.includes(l.id));
         setSquad(drafted);
       } catch (err) {
-        console.error("Failed to load squad:", err);
+        console.warn("Squad load notice:", err);
       } finally {
         setLoading(false);
       }

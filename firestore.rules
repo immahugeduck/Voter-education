@@ -1,30 +1,98 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Helper function to check if user is authenticated
-    function isAuthenticated() {
+    // Default-deny all documents
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper functions
+    function isSignedIn() {
       return request.auth != null;
     }
 
-    // Helper function to check if the document belongs to the requesting user
     function isOwner(userId) {
-      return isAuthenticated() && request.auth.uid == userId;
+      return isSignedIn() && request.auth.uid == userId;
     }
 
-    // Users collection
+    function isAdmin() {
+      return isSignedIn() && (
+        request.auth.token.email == 'zakkortesmaki@gmail.com' ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // Validation blueprints
+    function isValidUser(data) {
+      return data.uid is string && data.uid == request.auth.uid &&
+             data.email is string && data.email.size() <= 256;
+    }
+
+    function isValidVote(data) {
+      return data.userId is string && data.userId == request.auth.uid &&
+             data.billId is string && data.billId.size() <= 128 &&
+             data.vote is string && (data.vote == 'yea' || data.vote == 'nay');
+    }
+
+    function isValidBaselineData(data) {
+      return data.dataType is string && (
+               data.dataType == 'bills' ||
+               data.dataType == 'votes' ||
+               data.dataType == 'accomplishments' ||
+               data.dataType == 'sessions' ||
+               data.dataType == 'alerts'
+             ) &&
+             data.backupDate is string && data.backupDate.size() <= 32 &&
+             data.itemsCount is number && data.itemsCount >= 0;
+    }
+
+    function isValidDailyBackup(data) {
+      return data.backupId is string && data.backupId.size() <= 64 &&
+             data.backupDate is string && data.backupDate.size() <= 32 &&
+             data.billsCount is number && data.billsCount >= 0 &&
+             data.votesCount is number && data.votesCount >= 0;
+    }
+
+    // User profiles
     match /users/{userId} {
       allow read: if isOwner(userId);
-      allow create: if isOwner(userId);
-      allow update: if isOwner(userId);
-      allow delete: if false; // Only allow deletion via Cloud Functions or Admin SDK
+      allow create: if isOwner(userId) && isValidId(userId) && isValidUser(incoming());
+      allow update: if isOwner(userId) && isValidUser(incoming()) && incoming().uid == existing().uid;
+      allow delete: if false;
     }
 
-    // Votes collection
+    // Citizen votes on congressional legislation
     match /votes/{voteId} {
-      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
-      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
-      allow update: if isAuthenticated() && resource.data.userId == request.auth.uid && request.resource.data.userId == request.auth.uid;
-      allow delete: if false; // Only allow deletion via Cloud Functions or Admin SDK
+      allow read: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if isSignedIn() && isValidId(voteId) && isValidVote(incoming());
+      allow update: if isSignedIn() && isValidVote(incoming()) && existing().userId == request.auth.uid && incoming().userId == request.auth.uid;
+      allow delete: if false;
+    }
+
+    // Baseline congressional data (bills, voting, alerts, accomplishments)
+    match /baseline_data/{dataType} {
+      allow read: if true;
+      allow create, update: if isValidId(dataType) && isValidBaselineData(incoming());
+      allow delete: if false;
+    }
+
+    // Daily backups archive for persistent daily snapshots
+    match /daily_backups/{backupId} {
+      allow read: if true;
+      allow create, update: if isValidId(backupId) && isValidDailyBackup(incoming());
+      allow delete: if false;
     }
   }
 }

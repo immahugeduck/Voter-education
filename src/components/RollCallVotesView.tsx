@@ -24,6 +24,7 @@ import {
   Bot
 } from "lucide-react";
 import { RollCallVote, LegislativeSession, UpcomingVoteAlert, LegislatorScorecard, ChatMessage } from "../types";
+import FirebaseBaselineBackupCard from "./FirebaseBaselineBackupCard";
 
 interface RollCallVotesViewProps {
   votes: RollCallVote[];
@@ -81,17 +82,19 @@ export default function RollCallVotesView({
 
         // Load Legislators
         const resLegs = await fetch("/api/legislation/legislators");
-        const legsJson = await resLegs.json();
-        setLegislators(legsJson.data || []);
+        if (resLegs.ok) {
+          const legsJson = await resLegs.json();
+          setLegislators(legsJson.data || []);
 
-        if (legsJson.data && legsJson.data.length > 0) {
-          const hasDefault = legsJson.data.some((l: any) => l.id === "leg-1");
-          if (!hasDefault) {
-            setSelectedLegId(legsJson.data[0].id);
+          if (legsJson.data && legsJson.data.length > 0) {
+            const hasDefault = legsJson.data.some((l: any) => l.id === "leg-1");
+            if (!hasDefault) {
+              setSelectedLegId(legsJson.data[0].id);
+            }
           }
         }
       } catch (err) {
-        console.error("Failed to load alerts & legislators in unified view:", err);
+        console.warn("Alerts & legislators notice in unified view:", err);
       } finally {
         setIsLoadingAlerts(false);
       }
@@ -265,10 +268,11 @@ export default function RollCallVotesView({
         try {
           setIsLoadingAlerts(true);
           const res = await fetch("/api/legislation/alerts");
+          if (!res.ok) return;
           const json = await res.json();
           setAlerts(json.data || []);
         } catch (e) {
-          console.error(e);
+          console.warn("Alerts refresh notice:", e);
         } finally {
           setIsLoadingAlerts(false);
         }
@@ -299,6 +303,9 @@ export default function RollCallVotesView({
           </p>
         </div>
       </div>
+
+      {/* Firebase Baseline & Daily Backup Resilience Section */}
+      <FirebaseBaselineBackupCard onBackupComplete={onRefreshVotes} />
 
       {/* 2. Primary Tabs Selector & Control Panel */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-stone-200 pb-3">

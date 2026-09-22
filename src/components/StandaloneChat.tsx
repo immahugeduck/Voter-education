@@ -53,7 +53,7 @@ export default function StandaloneChat() {
       };
       setMessages((prev) => [...prev, aiMsg]);
     } catch (err: any) {
-      console.error(err);
+      console.warn("Standalone chat notice:", err);
       setMessages((prev) => [
         ...prev,
         {

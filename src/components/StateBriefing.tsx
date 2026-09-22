@@ -494,7 +494,10 @@ export default function StateBriefing({
     try {
       const resp = await fetch(`/api/civic/reps?address=${encodeURIComponent(exactAddress)}`);
       const data = await resp.json();
-      if (!resp.ok) throw new Error(data.error || "Failed to fetch exact representatives.");
+      if (!resp.ok) {
+        setCivicError(data.error || "Unable to retrieve representatives for this address.");
+        return;
+      }
       
       const officials: any[] = [];
       if (data.offices && data.officials) {
@@ -512,7 +515,7 @@ export default function StateBriefing({
       }
       setCivicReps(officials);
     } catch (err: any) {
-      setCivicError(err.message);
+      setCivicError(err.message || "Unable to retrieve representatives.");
     } finally {
       setCivicLoading(false);
     }
@@ -524,6 +527,7 @@ export default function StateBriefing({
       try {
         setLoading(true);
         const res = await fetch("/api/legislation/legislators");
+        if (!res.ok) return;
         const json = await res.json();
         const data = json.data || [];
         setLegislators(data);
@@ -537,7 +541,7 @@ export default function StateBriefing({
           }
         }
       } catch (err) {
-        console.error("Failed to load legislators for State Briefing:", err);
+        console.warn("Legislators load notice for State Briefing:", err);
       } finally {
         setLoading(false);
       }

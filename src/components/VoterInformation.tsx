@@ -30,12 +30,12 @@ export default function VoterInformation({ selectedLocalState, onStateChange }: 
     try {
       const resp = await fetch("/api/civic/elections");
       if (!resp.ok) {
-        throw new Error("Failed to fetch elections");
+        return;
       }
       const data = await resp.json();
       setElections(data.elections || []);
     } catch (err: any) {
-      console.error(err);
+      console.warn("Civic elections notice:", err);
     }
   };
 
@@ -52,12 +52,13 @@ export default function VoterInformation({ selectedLocalState, onStateChange }: 
       const data = await resp.json();
       
       if (!resp.ok) {
-        throw new Error(data.error || "Failed to fetch voter information");
+        setError(data.error || "No voter registration information currently found for this address.");
+        return;
       }
 
       setVoterInfo(data);
     } catch (err: any) {
-      setError(err.message || "An unexpected error occurred");
+      setError(err.message || "Unable to retrieve voter information for this location.");
     } finally {
       setLoading(false);
     }

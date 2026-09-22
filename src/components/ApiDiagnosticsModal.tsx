@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { X, RefreshCw, Key, ShieldCheck, ShieldAlert, Cpu, AlertCircle, Copy, Check } from "lucide-react";
+import FirebaseBaselineBackupCard from "./FirebaseBaselineBackupCard";
 
 interface ApiDiagnosticsModalProps {
   onClose: () => void;
@@ -35,12 +36,12 @@ export default function ApiDiagnosticsModal({ onClose }: ApiDiagnosticsModalProp
         throw new Error("Diagnostics response missing success indicator");
       }
     } catch (err: any) {
-      console.error("[Diagnostics] Failed to run key checks:", err);
+      console.warn("[Diagnostics] Key checks notice:", err?.message || err);
       // Construct fallback error states
       setData({
-        gemini: { status: "error", message: `Failed to fetch server diagnostic: ${err.message}` },
-        anthropic: { status: "error", message: `Failed to fetch server diagnostic: ${err.message}` },
-        googleCivic: { status: "error", message: `Failed to fetch server diagnostic: ${err.message}` }
+        gemini: { status: "error", message: `Unable to retrieve server diagnostic: ${err.message}` },
+        anthropic: { status: "error", message: `Unable to retrieve server diagnostic: ${err.message}` },
+        googleCivic: { status: "error", message: `Unable to retrieve server diagnostic: ${err.message}` }
       });
     } finally {
       setLoading(false);
@@ -192,6 +193,11 @@ Report generated at ${new Date().toLocaleString()}`;
                   </div>
                 </div>
               )}
+
+              {/* Firebase Cloud Firestore Baseline & Daily Backup Resilience */}
+              <div className="pt-2 border-t border-stone-200">
+                <FirebaseBaselineBackupCard />
+              </div>
             </div>
           )}
         </div>
